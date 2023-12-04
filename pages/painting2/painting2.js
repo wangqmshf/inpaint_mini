@@ -510,7 +510,7 @@ Page({
         //   success: (res) => { // 注册回调函数
         //     console.log(res)
         wx.getImageInfo({
-          src: imagePATH,
+          src: tmpPicPath,
           success: function (res) {
             let [height, width] = [Math.floor(that.data.canvasWidth / res.width * res.height), that.data.canvasWidth];
             if (height > that.data.windowHeight - 50) {
