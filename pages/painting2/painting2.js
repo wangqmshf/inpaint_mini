@@ -2,6 +2,8 @@
 global.wasm_url = '/utils/opencv3.4.16.wasm.br'
 // opencv_exec.js会从global.wasm_url获取wasm路径
 let cv = require('../../utils/opencv_exec.js');
+const modelUrl = 'https://test-1306637385.cos.ap-nanjing.myqcloud.com/migan.onnx'
+
 Page({
 
   /**
@@ -15,27 +17,25 @@ Page({
     windowHeight: 0,
     storeSrc: [],
     prevPosition: [0, 0],
+    points: [],
 
     btnInfo: [{
         type: 'width',
         background: 'url("https://s1.ax1x.com/2022/05/25/XkS46f.png") white no-repeat; background-size: 30px 30px;'
       },
       {
-        type: 'color',
-        background: 'url("https://s1.ax1x.com/2022/05/25/XkSqts.png") white no-repeat; background-size: 24px 24px;background-position: 3px 3px;'
+        type: 'inpaint',
+        background: 'url("https://z1.ax1x.com/2023/12/04/pi6QAzT.png") white no-repeat; background-size: 20px 20px;background-position: 5px 5px;'
       },
       {
         type: 'back',
         background: 'url("https://s1.ax1x.com/2022/05/25/XkAkZV.png") white no-repeat; background-size: 38px 38px;background-position: -4px -4px;'
       },
-      // {
-      //   type: 'save',
-      //   background: 'url("https://s1.ax1x.com/2022/05/25/Xkpj5d.png") white no-repeat; background-size: 20px 20px;background-position: 5px 5px;'
-      // },
       {
-        type: 'inpaint',
+        type: 'save',
         background: 'url("https://s1.ax1x.com/2022/05/25/Xkpj5d.png") white no-repeat; background-size: 20px 20px;background-position: 5px 5px;'
-      }
+      },
+
     ],
     width: false,
     color: false,
@@ -47,16 +47,6 @@ Page({
   // 获取图像数据和调整图像大小
   getImageData(image, offscreenCanvas) {
     var _that = this
-    // const ctx = wx.createCanvasContext(canvasId);
-
-    // var canvasWidth = image.width;
-    // let maxCanvasWidth = this.data.canvasWidth
-    // if (canvasWidth > maxCanvasWidth) {
-    //   canvasWidth = maxCanvasWidth;
-    // }
-    // // canvas Height
-    // var canvasHeight = Math.floor(canvasWidth * (image.height / image.width));
-    // // 离屏画布的宽度和高度不能小于图像的
     var canvasWidth = _that.data.canvasWidth;
     var canvasHeight = _that.data.canvasHeight;
     offscreenCanvas.width = canvasWidth;
@@ -106,16 +96,14 @@ Page({
         maskTemp[h * W + w] = mask[h * W + w] - 0.5
       }
     }
-
+    //链接两个字节数组
     const res = new Float32Array(mask.length + img.length)
     const maskLength = mask.length
-
     for (let c = 0; c < maskLength; c++) {
       res[c] = maskTemp[c]
     }
 
     const imgLength = img.length
-
     for (let c = 0; c < imgLength; c++) {
       res[maskLength + c] = temp[c]
     }
@@ -124,7 +112,7 @@ Page({
   },
 
   async getImgData() {
-    const imageData = await this.createImageElement(`${wx.env.USER_DATA_PATH}/pic.png`)
+    const imageData = await this.createImageElement(this.data.storeSrc[this.data.storeSrc.length - 1])
     return imageData
   },
   processImage(imageData) {
@@ -288,21 +276,38 @@ Page({
         // 监听error事件
         that.session.onError((error) => {
           console.error(error);
+          wx.showToast({
+            title: '模型加载失败',
+            icon: 'error',
+            duration: 2000
+          })
         });
         that.session.onLoad(() => {
           that.ready = true;
           console.log("load ok");
+          wx.showToast({
+            title: '模型加载成功',
+            icon: 'success',
+            duration: 2000
+          })
         });
       },
       fail: (res) => {
+        wx.showToast({
+          title: '尝试下载模型',
+          icon: 'success',
+          duration: 2000
+        })
         console.log(modelPath)
         wx.downloadFile({
-          url: "https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx",
+          url: modelUrl,
           success(res) {
             if (res.statusCode === 200) {
               if (res.totalBytesExpectedToWrite === res.totalBytesWritten) {
-                wx.playVoice({
-                  filePath: res.tempFilePath
+                wx.showToast({
+                  title: '模型下载成功',
+                  icon: 'success',
+                  duration: 2000
                 })
                 wx.getFileSystemManager().saveFile({
                   tempFilePath: res.tempFilePath,
@@ -330,10 +335,20 @@ Page({
                     // 监听error事件
                     that.session.onError((error) => {
                       console.error(error);
+                      wx.showToast({
+                        title: '模型加载失败',
+                        icon: 'error',
+                        duration: 2000
+                      })
                     });
                     that.session.onLoad(() => {
                       that.ready = true;
                       console.log("load ok");
+                      wx.showToast({
+                        title: '模型加载成功',
+                        icon: 'success',
+                        duration: 2000
+                      })
                     });
 
                   },
@@ -348,53 +363,72 @@ Page({
           },
           fail: function (res) {
 
-            wx.chooseMessageFile({
-              count: 1,
-              type: 'file',
-              success: function (res) {
-
-                console.log(res)
-                wx.getFileSystemManager().saveFile({
-                  tempFilePath: res.tempFiles[0].path,
-                  filePath: modelPath,
-                  success: (res) => { // 注册回调函数
-                    console.log(res)
-                    that.session = wx.createInferenceSession({
-                      model: modelPath,
-                      /* 0: Lowest  precision e.g., LS16 + A16 + Winograd A16 + approx. math
-                         1: Lower   precision e.g., LS16 + A16 + Winograd off + approx. math
-                         2: Modest  precision e.g., LS16 + A32 + Winograd A32 + approx. math
-                         3: Higher  precision e.g., LS32 + A32 + Winograd A32 + approx. math
-                         4: Highest precision e.g., LS32 + A32 + Winograd A32 + precise math
-              
-                         Higher precision always require longer time to run session
-                      */
-                      precisionLevel: 4,
-                      allowNPU: false, // wheather use NPU for inference, only useful for IOS
-                      allowQuantize: true, // wheather generate quantize model
-                    });
-
-                    // 监听error事件
-                    that.session.onError((error) => {
-                      console.error(error);
-                    });
-                    that.session.onLoad(() => {
-                      that.ready = true;
-                      console.log("load ok");
-                    });
-                  },
-                  fail(res) {
-                    console.error(res)
-                    return
-                  }
-                })
-
-
-              },
-              fail: function (res) {
-                console.log(res);
-              }
+            wx.showToast({
+              title: '下载模型失败',
+              icon: 'error',
+              duration: 2000
             })
+            // wx.showToast({
+            //   title: '下载模型失败，请从聊天记录中选择模型',
+            //   icon: 'none',
+            //   duration: 2000
+            // })
+            // wx.chooseMessageFile({
+            //   count: 1,
+            //   type: 'file',
+            //   success: function (res) {
+            //     console.log(res)
+            //     wx.getFileSystemManager().saveFile({
+            //       tempFilePath: res.tempFiles[0].path,
+            //       filePath: modelPath,
+            //       success: (res) => { // 注册回调函数
+            //         console.log(res)
+            //         that.session = wx.createInferenceSession({
+            //           model: modelPath,
+            //           /* 0: Lowest  precision e.g., LS16 + A16 + Winograd A16 + approx. math
+            //              1: Lower   precision e.g., LS16 + A16 + Winograd off + approx. math
+            //              2: Modest  precision e.g., LS16 + A32 + Winograd A32 + approx. math
+            //              3: Higher  precision e.g., LS32 + A32 + Winograd A32 + approx. math
+            //              4: Highest precision e.g., LS32 + A32 + Winograd A32 + precise math
+
+            //              Higher precision always require longer time to run session
+            //           */
+            //           precisionLevel: 4,
+            //           allowNPU: false, // wheather use NPU for inference, only useful for IOS
+            //           allowQuantize: true, // wheather generate quantize model
+            //         });
+
+            //         // 监听error事件
+            //         that.session.onError((error) => {
+            //           console.error(error);
+            //           wx.showToast({
+            //             title: '模型加载失败',
+            //             icon: 'error',
+            //             duration: 2000
+            //           })
+            //         });
+            //         that.session.onLoad(() => {
+            //           that.ready = true;
+            //           console.log("load ok");
+            //           wx.showToast({
+            //             title: '模型加载成功',
+            //             icon: 'success',
+            //             duration: 2000
+            //           })
+            //         });
+            //       },
+            //       fail(res) {
+            //         console.error(res)
+            //         return
+            //       }
+            //     })
+
+
+            //   },
+            //   fail: function (res) {
+            //     console.log(res);
+            //   }
+            // })
           }
         }).onProgressUpdate((res) => {
           console.log(res.progress)
@@ -418,13 +452,61 @@ Page({
       },
     })
 
-    wx.getFileSystemManager().access({
-      path: imagePATH,
-      success: (res) => {
-        console.log(res)
+    // wx.getFileSystemManager().access({
+    //   path: imagePATH,
+    //   success: (res) => {
+    //     console.log(res)
+    //     that.setData({
+    //       hasChoosedImg: true,
+    //     })
+    //     wx.getImageInfo({
+    //       src: imagePATH,
+    //       success: function (res) {
+    //         let [height, width] = [Math.floor(that.data.canvasWidth / res.width * res.height), that.data.canvasWidth];
+    //         if (height > that.data.windowHeight - 50) {
+    //           height = that.data.windowHeight - 50;
+    //           width = Math.floor(height / res.height * res.width);
+    //         }
+    //         that.setData({
+    //           canvasHeight: height,
+    //           canvasWidth: width
+    //         });
+    //         setTimeout(() => {
+    //           let ctx = wx.createCanvasContext('myCanvas');
+    //           ctx.drawImage(res.path, 0, 0, that.data.canvasWidth, that.data.canvasHeight);
+    //           ctx.draw();
+
+    //           wx.canvasGetImageData({
+    //             canvasId: 'myCanvas',
+    //             x: 0,
+    //             y: 0,
+    //             width: that.data.canvasWidth,
+    //             height: that.data.canvasHeight,
+    //             success(res) {
+    //               console.log(res.width) // 100
+    //               console.log(res.height) // 100
+    //               console.log(res.data instanceof Uint8ClampedArray) // true
+    //               console.log(res.data.length) // 100 * 100 * 4
+    //             }
+    //           })
+    //         }, 500)
+
+    //       }
+    //     })
+    //   },
+    //   fail: (res) => {
+    wx.chooseImage({
+      success: function (res) {
         that.setData({
           hasChoosedImg: true,
         })
+        console.log(res)
+        const tmpPicPath = res.tempFiles[0].path
+        // wx.getFileSystemManager().saveFile({
+        //   tempFilePath: tmpPicPath,
+        //   filePath: imagePATH,
+        //   success: (res) => { // 注册回调函数
+        //     console.log(res)
         wx.getImageInfo({
           src: imagePATH,
           success: function (res) {
@@ -462,72 +544,21 @@ Page({
 
           }
         })
+        //   },
+        //   fail(res) {
+        //     console.error(res)
+        //     return
+        //   }
+        // })
+
+
       },
-      fail: (res) => {
-        wx.chooseImage({
-          success: function (res) {
-            that.setData({
-              hasChoosedImg: true,
-            })
-            console.log(res)
-            const tmpPicPath = res.tempFiles[0].path
-            wx.getFileSystemManager().saveFile({
-              tempFilePath: tmpPicPath,
-              filePath: imagePATH,
-              success: (res) => { // 注册回调函数
-                console.log(res)
-                wx.getImageInfo({
-                  src: imagePATH,
-                  success: function (res) {
-                    let [height, width] = [Math.floor(that.data.canvasWidth / res.width * res.height), that.data.canvasWidth];
-                    if (height > that.data.windowHeight - 50) {
-                      height = that.data.windowHeight - 50;
-                      width = Math.floor(height / res.height * res.width);
-                    }
-                    that.setData({
-                      canvasHeight: height,
-                      canvasWidth: width
-                    });
-                    setTimeout(() => {
-                      let ctx = wx.createCanvasContext('myCanvas');
-                      ctx.drawImage(res.path, 0, 0, that.data.canvasWidth, that.data.canvasHeight);
-                      ctx.draw();
-
-                      wx.canvasGetImageData({
-                        canvasId: 'myCanvas',
-                        x: 0,
-                        y: 0,
-                        width: that.data.canvasWidth,
-                        height: that.data.canvasHeight,
-                        success(res) {
-                          console.log(res.width) // 100
-                          console.log(res.height) // 100
-                          console.log(res.data instanceof Uint8ClampedArray) // true
-                          console.log(res.data.length) // 100 * 100 * 4
-                          // that.setData({
-                          //   imgData: res.data,
-                          // })
-                        }
-                      })
-                    }, 500)
-
-                  }
-                })
-              },
-              fail(res) {
-                console.error(res)
-                return
-              }
-            })
-
-
-          },
-          fail: function (res) {
-            console.log(res);
-          }
-        })
+      fail: function (res) {
+        console.log(res);
       }
     })
+    //   }
+    // })
 
 
 
@@ -541,12 +572,6 @@ Page({
         width: !this.data.width,
         color: false,
         canvasHeightLen: (!this.data.width) ? Math.min(this.data.canvasHeight, this.data.windowHeight - this.data.w - 130) : 0,
-      })
-    } else if (btnType == 'color') {
-      this.setData({
-        width: false,
-        color: !this.data.color,
-        canvasHeightLen: (!this.data.color) ? Math.min(this.data.canvasHeight, this.data.windowHeight - this.data.w - 205) : 0,
       })
     } else if (btnType == 'back') {
       this.setData({
@@ -568,6 +593,11 @@ Page({
             filePath: res.tempFilePath,
             success: function (r) {
               console.log(r)
+              wx.showToast({
+                title: '图片已经保存到相册',
+                icon: 'success',
+                duration: 2000
+              })
             },
             fail(error) {
               console.log("图片保存失败!");
@@ -595,10 +625,12 @@ Page({
       })
     } else if (btnType == 'inpaint') {
       let that = this
-      console.log(wx.env.USER_DATA_PATH)
-      // if(!this.data.points){
-      //   return
-      // }
+      if (that.data.points.length === 0) {
+        return
+      }
+      wx.showLoading({
+        title: '正在处理中，请耐心等待。。。',
+      })
       // console.log(this.data.points)
 
       let imgData = await that.getImgData()
@@ -614,125 +646,83 @@ Page({
       };
 
       console.log(xinput)
-      var log = wx.getRealtimeLogManager ? wx.getRealtimeLogManager() : null
-      log.error(xinput)
-      that.session.run({
-        input: xinput
-      }).then(res => {
-        // console.log(res.output)
-
-        let output = new Float32Array(res.output.data)
-        const chwToHwcData = that.postProcess(output, 512, 512)
-        var rgb = new Uint8ClampedArray(chwToHwcData)
-        const imageData = {
-          data: rgb,
-          width: 512,
-          height: 512
-        }
+      try {
 
 
-        // let output = new Float32Array(res.output.data)
-        // const hwSize = 512 * 512
+        that.session.run({
+          input: xinput
+        }).then(res => {
+          // console.log(res.output)
 
-        // var finalout = new Uint8ClampedArray(4 * hwSize);
-
-        // // fill the alpha channel
-        // finalout.fill(255);
-
-        // // convert from nchw to nhwc
-        // let modelChannel =3
-        // let idx = 0;
-        // for (var c = 0; c < modelChannel; ++c) {
-        //   for (var hw = 0; hw < hwSize; ++hw) {
-        //     var dstIdx = hw * 4 + c;
-        //     finalout[dstIdx] = Math.max(0, Math.min(Math.round(output[idx]), 255));
-        //     idx++;
-        //   }
-        // }
+          let output = new Float32Array(res.output.data)
+          const chwToHwcData = that.postProcess(output, 512, 512)
+          var rgb = new Uint8ClampedArray(chwToHwcData)
+          const imageData = {
+            data: rgb,
+            width: 512,
+            height: 512
+          }
 
 
-        // const imageData = new ImageData(
-        //   new Uint8ClampedArray(chwToHwcData),
-        //   size,
-        //   size
-        // )
-        const dst = new cv.Mat()
-        const dsize = new cv.Size(that.data.canvasWidth, that.data.canvasHeight)
-        const outImgMat = cv.matFromImageData(imageData)
+          const dst = new cv.Mat()
+          const dsize = new cv.Size(that.data.canvasWidth, that.data.canvasHeight)
+          const outImgMat = cv.matFromImageData(imageData)
 
-        cv.resize(outImgMat, dst, dsize, 0, 0, cv.INTER_CUBIC)
+          cv.resize(outImgMat, dst, dsize, 0, 0, cv.INTER_CUBIC)
 
-        const result = that.mergeImg(dst, imgData, maskData)
-        dst.delete()
-        // console.log("chwToHwcData")
-        // wx.canvasPutImageData({
-        //   canvasId: 'myCanvas',
-        //   data: rgb,
-        //   height: 512,
-        //   width: 512,
-        //   x: 0,
-        //   y: 0,
-        // }).then((res) => {
-        //   console.log(res)
-        // }).catch((err) => {
-        //   console.log(err)
-        // })
+          const result = that.mergeImg(dst, imgData, maskData)
+          dst.delete()
 
-        wx.canvasPutImageData({
-          canvasId: 'myCanvas',
-          data: result,
-          height: that.data.canvasHeight,
-          width: that.data.canvasWidth,
-          x: 0,
-          y: 0,
-        }).then((res) => {
-          console.log(res)
+
+          wx.canvasPutImageData({
+            canvasId: 'myCanvas',
+            data: result,
+            height: that.data.canvasHeight,
+            width: that.data.canvasWidth,
+            x: 0,
+            y: 0,
+          }).then((res) => {
+            setTimeout(function () {
+              wx.hideLoading()
+            }, 200)
+            console.log(res)
+            that.setData({
+              points: [],
+            })
+            wx.canvasToTempFilePath({
+              canvasId: 'myCanvas',
+              width: that.data.canvasWidth,
+              height: that.data.canvasHeight,
+              destHeight: that.data.canvasHeight,
+              destWidth: that.data.canvasWidth,
+              success: function (res) {
+                let src = that.data.storeSrc;
+                src.push(res.tempFilePath);
+
+                that.setData({
+                  storeSrc: src
+                })
+              }
+            })
+
+          }).catch((err) => {
+            console.log(err)
+          })
         }).catch((err) => {
           console.log(err)
         })
-      }).catch((err) => {
-        console.log(err)
-      })
-
-      // that.session.run({
-      //   input: {
-      //     type: 'float32',
-      //     data: new Float32Array(1 * 4 * 512 * 512).buffer,
-      //     shape: [1, 4, 512, 512] // NCHW 顺序
-      //   }
-      // }).then(res => {
-      //   console.log('randmon')
-      //   console.log(res.output)
-      //   let output = new Float32Array(res.output)
-      //   const hwSize = 512 * 512;
-
-      //   var finalout = new Uint8ClampedArray(4 * hwSize);
-
-      //   // fill the alpha channel
-      //   finalout.fill(255);
-
-      //   // convert from nchw to nhwc
-      //   idx = 0;
-      //   for (var c = 0; c < modelChannel; ++c) {
-      //     for (var hw = 0; hw < hwSize; ++hw) {
-      //       var dstIdx = hw * 4 + c;
-      //       finalout[dstIdx] = Math.max(0, Math.min(Math.round(output[idx]), 255));
-      //       idx++;
-      //     }
-      //   }
+      } catch (error) {
+        wx.showToast({
+          title: '运行失败',
+          icon: 'error',
+          duration: 2000
+        })
+        setTimeout(function () {
+          wx.hideLoading()
+        }, 200)
+      }
 
 
-      //   wx.canvasPutImageData({
-      //     canvasId: 'myCanvas',
-      //     data: finalout,
-      //     height: 512,
-      //     width: 512,
-      //     x: 0,
-      //     y: 0,
-      //   }).then((res) => {
-      //     console.log(res)
-      //   })
-      // })
     }
   },
 

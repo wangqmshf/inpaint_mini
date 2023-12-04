@@ -4,6 +4,6 @@
 </view>
 
 <view class="painting2" bindtap="toPainting2">
-  <image src="../../images/paint2.png" mode="aspectFit"/>
+  <image src="https://z1.ax1x.com/2023/12/04/pi6QAzT.png" mode="aspectFit"/>
 </view>
 
