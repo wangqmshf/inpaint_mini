@@ -288,7 +288,7 @@ Page({
           wx.showToast({
             title: '模型加载成功',
             icon: 'success',
-            duration: 2000
+            duration: 4000
           })
         });
       },
@@ -347,7 +347,7 @@ Page({
                       wx.showToast({
                         title: '模型加载成功',
                         icon: 'success',
-                        duration: 2000
+                        duration: 4000
                       })
                     });
 
@@ -368,6 +368,7 @@ Page({
               icon: 'error',
               duration: 2000
             })
+            //for debug
             // wx.showToast({
             //   title: '下载模型失败，请从聊天记录中选择模型',
             //   icon: 'none',
@@ -451,7 +452,7 @@ Page({
         })
       },
     })
-
+    //for debug
     // wx.getFileSystemManager().access({
     //   path: imagePATH,
     //   success: (res) => {
@@ -502,6 +503,7 @@ Page({
         })
         console.log(res)
         const tmpPicPath = res.tempFiles[0].path
+        //for debug
         // wx.getFileSystemManager().saveFile({
         //   tempFilePath: tmpPicPath,
         //   filePath: imagePATH,
@@ -535,9 +537,6 @@ Page({
                   console.log(res.height) // 100
                   console.log(res.data instanceof Uint8ClampedArray) // true
                   console.log(res.data.length) // 100 * 100 * 4
-                  // that.setData({
-                  //   imgData: res.data,
-                  // })
                 }
               })
             }, 500)
